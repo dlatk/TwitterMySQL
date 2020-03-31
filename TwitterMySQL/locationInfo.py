@@ -90,7 +90,7 @@ def makeStateLookupRegularExpressionDict( state_to_matches_dict ):
     return state_to_regExp
 state_to_compiled_regular_expressions = makeStateLookupRegularExpressionDict( state_to_matches )
 
-     
+
 coordRE = re.compile(r'\w{0,8}\s*\:?\s*\b(\-?[0-9]+\.[0-9]+)\s*\,\s*(\-?[0-9]+\.[0-9]+)\b')
 
 #Location Mapping Class#
@@ -114,8 +114,11 @@ class LocationMap:
     def loadZipData(self, data_file="/data/twitter/free-zipcode-database.csv"):
         if self.directory:
             data_file = self.directory+'/'+data_file
-	else:
-	    data_file=PERMA_PATH+data_file
+        else:
+            script_loc = os.path.dirname(os.path.abspath(__file__))
+            data_file = os.path.join(script_loc, './free-zipcode-database.csv')
+            #data_file="./free-zipcode-database.csv"
+
         with open(data_file, 'rb') as read_file:
             csv_reader = csv.reader(read_file)
             for ii, record in enumerate(csv_reader):
@@ -132,7 +135,7 @@ class LocationMap:
                 # import pdb
                 # pdb.set_trace()
 
-    def reverseGeocode(self, lat, lon): 
+    def reverseGeocode(self, lat, lon):
         if not self.geocode:
             self.geocode = geocoders.GeoNames()#import geopy geocoders if using
 
@@ -146,7 +149,7 @@ class LocationMap:
                 count += 1
                 global MAX_ERRORS
                 global ERROR_PAUSE
-                if (count < MAX_ERRORS): 
+                if (count < MAX_ERRORS):
                     warn("      ERROR: " + str(sys.exc_info()[0]) + ", " + str(count) + " try, trying again in " + str(ERROR_PAUSE) + " seconds")
                     time.sleep(ERROR_PAUSE)
                 else:
@@ -161,7 +164,7 @@ class LocationMap:
             FIPSindex = 0
             stateFIPSindex = 0
             nameIndex = 0
-        
+
             for i in range(len(fields)):
                 if (fields[i][0] == 'NAMELSAD'):
                     nameIndex = i-1
@@ -187,21 +190,23 @@ class LocationMap:
     def loadLocalData(self):
         if len(self.stateShapes) < 1:
             # sf= shapefile.Reader(str(self.directory)+'/'+self.STATESHAPEFILE)
-            sf = shapefile.Reader(PERMA_PATH+"/data/twitter/"+self.STATESHAPEFILE) 
-            
-            
+            #sf = shapefile.Reader(PERMA_PATH+"/data/twitter/"+self.STATESHAPEFILE)
+            script_loc = os.path.dirname(os.path.abspath(__file__))
+            shape_files = os.path.join(script_loc, self.STATESHAPEFILE)
+            sf = shapefile.Reader(shape_files)
+
             fields = sf.fields
             stateFieldI = 0
-        
+
             for i in range(len(fields)):
                 if (fields[i][0] == 'STATE'):
                     stateFieldI = i-1
-                
+
             srs = sf.shapeRecords()
 
             for sr in srs:
                 scode = sr.record[stateFieldI].strip()
-                if (len(scode) > 2): 
+                if (len(scode) > 2):
                     scode = state_to_code[scode.upper()]
                 if scode not in self.stateShapes:
                     self.stateShapes[scode] = []
@@ -223,7 +228,7 @@ class LocationMap:
     def reverseGeocodeLocalFips(self, lat, lon):
         """uses local maps and pip to reverse geocode"""
         self.loadLocalFIPSData()
-        
+
         for fipsTuple, shapes in self.countyShapes.iteritems():
             for shape in shapes:
                 if self.pointInBox(lon, lat, shape.bbox):
@@ -236,7 +241,7 @@ class LocationMap:
     def reverseGeocodeLocal(self, lat, lon):
         """uses local maps and pip to reverse geocode"""
         self.loadLocalData()
-        
+
         for state, shapes in self.stateShapes.iteritems():
             for shape in shapes:
                 if self.pointInBox(lon, lat, shape.bbox):

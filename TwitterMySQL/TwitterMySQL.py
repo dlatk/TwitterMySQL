@@ -1,5 +1,10 @@
 #! /usr/bin/python
 
+__author__ = "Maarten Sap, Salvatore Giorgi"
+__email__ = "maartensap93@gmail.com, sal.giorgi@gmail.com"
+__version__ = "0.4"
+
+
 """
 TODOs:
 pull retweeted message as well as original
@@ -130,6 +135,8 @@ class TwitterMySQL:
 						[Default: DEFAULT_MYSQL_COL_DESC]
 	- host            host where the MySQL database is on
 						[Default: localhost]
+	- columnShortList	List of MySQL columns to save, must correspond
+						to keys in DEFAULT_TWEET_JSON_SQL_CORR
 	- any other MySQL.connect argument
 	"""
 
@@ -172,7 +179,10 @@ class TwitterMySQL:
 			self.jTweetToRow = kwargs["jTweetToRow"]
 			del kwargs["jTweetToRow"]
 		else:
-			self.jTweetToRow = DEFAULT_TWEET_JSON_SQL_CORR
+			if "columnShortList" in kwargs and kwargs["columnShortList"]:
+				self.jTweetToRow = {k:v for k,v in DEFAULT_TWEET_JSON_SQL_CORR.items() if k in kwargs["columnShortList"]}
+			else:
+				self.jTweetToRow = DEFAULT_TWEET_JSON_SQL_CORR
 
 		if "fields" in kwargs and "SQLfieldsExp" in kwargs:
 			# Fields from the JSON Tweet to pull out
@@ -193,7 +203,11 @@ class TwitterMySQL:
 							for f in self.columns_description
 							if f.split(' ')[0][:5] != "index"]
 		else:
-			self.columns_description = DEFAULT_MYSQL_COL_DESC
+			if "columnShortList" in kwargs and kwargs["columnShortList"]:
+				self.columns_description = [i for i in DEFAULT_MYSQL_COL_DESC if i.split()[0] in kwargs["columnShortList"]]
+				del kwargs["columnShortList"]
+			else:
+				self.columns_description = DEFAULT_MYSQL_COL_DESC
 			self.columns = [f.split(' ')[0]
 							for f in self.columns_description
 							if f.split(' ')[0][:5] != "index"]
@@ -221,6 +235,12 @@ class TwitterMySQL:
 			self.columns_description.append("spam int(1)")
 			self.columns.append("spam")
 			del kwargs["checkSpam"]
+
+		if "tweetsSinceDate" in kwargs:
+			self.tweets_since_date = kwargs["tweetsSinceDate"].date()
+			del kwargs["tweetsSinceDate"]
+		else:
+			self.tweets_since_date = ""
 
 		try:
 			self._connect(kwargs)
@@ -374,6 +394,13 @@ class TwitterMySQL:
 		SQL = "SELECT DISTINCT user_id FROM %s" % (table)
 		return map(lambda x:x[0], self._execute(SQL).fetchall())
 
+	def getUserMaxIDList(self, table = None):
+		"""Executes a given query, expecting one resulting column. Returns results as a list"""
+		table = self.table if not table else table
+		SQL = """SELECT t1.user_id, t1.message_id FROM {table} t1 WHERE t1.created_at_utc = (SELECT MAX(t2.created_at_utc) FROM {table} t2 WHERE t2.user_id = t1.user_id)""".format(table=self.table)
+		self._execute(SQL)
+		return map(lambda x:(int(x[0]),int(x[1])), self.cur.fetchall())
+
 
 	def _tweetTimeToMysql(self, timestr):
 		# Mon Jan 25 05:02:27 +0000 2010
@@ -383,16 +410,23 @@ class TwitterMySQL:
 		return time.strftime("%Y_%m",time.strptime(mysqlTime,"%Y-%m-%d %H:%M:%S"))
 
 	def _prepTweet(self, jTweet):
-
 		tweet = {}
-
 		for SQLcol in self.columns:
 			try:
-				if SQLcol in self.jTweetToRow:
 
+				if SQLcol in self.jTweetToRow:
+					if SQLcol == "message":
+						if 'extended_tweet' in jTweet:
+							self.jTweetToRow[SQLcol] = "['extended_tweet']['full_text']"
+						elif 'full_text' in jTweet:
+							self.jTweetToRow[SQLcol] = "['full_text']"
+						elif 'text' in jTweet:
+							self.jTweetToRow[SQLcol] = "['text']"
+						else:
+							print("Neither 'text' nor 'full_text' in Tweet json. You possibly have empty messages")
+							print(jTweet)
+							exit()
 					tags = ''
-					#print self.jTweetToRow[SQLcol]
-					#print re.split(r'\[(.*?)\]', self.jTweetToRow[SQLcol])
 					for tag in re.split(r'\[(.*?)\]', self.jTweetToRow[SQLcol]):
 						if tag == '':
 							continue
@@ -407,13 +441,25 @@ class TwitterMySQL:
 						#successful: values can be found
 						try:
 							result = eval("jTweet%s" % self.jTweetToRow[SQLcol])
+							if SQLcol == "message" and 'retweeted_status' in jTweet:
+								# get full text of original tweet and add to retweet
+								try:
+									if 'extended_tweet' in jTweet['retweeted_status']:
+										orig_tweet_text =  jTweet['retweeted_status']['extended_tweet']['full_text']
+									elif 'full_text' in jTweet['retweeted_status']:
+										orig_tweet_text =  jTweet['retweeted_status']['full_text']
+									elif 'text' in jTweet['retweeted_status']:
+										orig_tweet_text =  jTweet['retweeted_status']['text']
+
+									result = result.split(orig_tweet_text.split()[0],1)[0]+orig_tweet_text
+								except:
+									pass
 							if isinstance(result, str):
 								result = unicode(result)
 								result = self._connection.escape_string(result)
 
 							tweet[SQLcol] = result
-							#if SQLcol == 'message':
-							#    print result
+
 							#tweet[SQLcol] = self._connection.escape_string(eval("jTweet%s" % self.jTweetToRow[SQLcol]))
 
 						except KeyError, TypeError:
@@ -426,21 +472,23 @@ class TwitterMySQL:
 
 
 					#place attributes cannot exist if ['place'] is null
-#                    if self.jTweetToRow[SQLcol].startswith('[\'place\']') and jTweet['place'] is None:
-#                        tweet[SQLcol] = None
-#                        continue
-#
-#                    if self.jTweetToRow[SQLcol].startswith('[\'place\'][\'attributes\']') and (jTweet['place']['attributes'] is None or not jTweet['place']['attributes']):
-#                        tweet[SQLcol] = None
-#                        print self.jTweetToRow[SQLcol]
-#                        print jTweet['place']
-#                        continue
+		#                    if self.jTweetToRow[SQLcol].startswith('[\'place\']') and jTweet['place'] is None:
+		#                        tweet[SQLcol] = None
+		#                        continue
+		#
+		#                    if self.jTweetToRow[SQLcol].startswith('[\'place\'][\'attributes\']') and (jTweet['place']['attributes'] is None or not jTweet['place']['attributes']):
+		#                        tweet[SQLcol] = None
+		#                        print self.jTweetToRow[SQLcol]
+		#                        print jTweet['place']
+		#                        continue
 
 					#tweet[SQLcol] = eval("jTweet%s" % self.jTweetToRow[SQLcol])
 
 					if isinstance(tweet[SQLcol], str) or isinstance(tweet[SQLcol], unicode):
 						tweet[SQLcol] = HTMLParser().unescape(tweet[SQLcol]).encode("utf-8")
 					if SQLcol == "created_at_utc":
+						if self.tweets_since_date and datetime.datetime.strptime(self._tweetTimeToMysql(tweet[SQLcol]), "%Y-%m-%d %H:%M:%S").date() < self.tweets_since_date:
+							return 'all_tweets_since_date'
 						tweet[SQLcol] = self._tweetTimeToMysql(tweet[SQLcol])
 					if SQLcol == "source":
 						try:
@@ -462,6 +510,7 @@ class TwitterMySQL:
 						tweet[SQLcol] = None
 			except KeyError:
 				tweet[SQLcol] = None
+
 
 		if not any(tweet.values()):
 			raise NotImplementedError("OOPS", jTweet, tweet)
@@ -505,6 +554,10 @@ class TwitterMySQL:
 				for i, response in enumerate(r.get_iterator()):
 					# Checking for error messages
 					if isinstance(response, int) or "delete" in response:
+						continue
+					if "limit" in response:
+						missed = response["limit"]["track"]
+						print("\nMissed " + str(missed) + " so far due to rate limiting.")
 						continue
 					if i == 0 and "message" in response and "code" in response:
 						if response['code'] == 88: # Rate limit exceeded
@@ -682,7 +735,12 @@ class TwitterMySQL:
 
 		while ok:
 
-			tweets = [tweet for tweet in self._apiRequest('statuses/user_timeline', params)]
+			tweets = list()
+			for tweet in self._apiRequest('statuses/user_timeline', params):
+				if tweet == "all_tweets_since_date":
+					ok = False
+					continue
+				tweets.append(tweet)
 			if not tweets:
 				# Warn about no tweets?
 				if "max_id" in params:
@@ -726,6 +784,46 @@ class TwitterMySQL:
 			monthlyTables = False
 
 		self._tweetsToMySQL(self.userTimeline(**params), replace = replace, monthlyTables = monthlyTables)
+
+	def messageIDs(self, **params):
+		"""
+		For a given user, returns all the accessible tweets from that user,
+		starting with the most recent ones (Twitter imposes a 3200 tweet limit).
+
+		Here's an example of how to use it:
+		for tweet in userTimeline(screen_name = "taylorswift13"):
+			print tweet
+
+		See http://dev.twitter.com/rest/reference/get/statuses/user_timeline for details
+		"""
+		tweets = [tweet for tweet in self._apiRequest('statuses/lookup', params)]
+		for tweet in tweets:
+			yield tweet	
+
+	def messageIDsToMySQL(self, **params):
+		"""
+		For a given list of ids, inserts all the accessible tweets 
+		the current table. (Twitter imposes a 3200 tweet limit).
+
+		For details on keywords to use, see
+		https://developer.twitter.com/en/docs/tweets/post-and-engage/api-reference/get-statuses-lookup
+		"""
+		print "Grabbing tweets from a list of ids and inserting into MySQL"
+
+		# Replace SQL command instead of insert
+		if "replace" in params:
+			replace = params["replace"]
+			del params["replace"]
+		else:
+			replace = False
+
+		if "monthlyTables" in params:
+			monthlyTables = params["monthlyTables"]
+			del params["monthlyTables"]
+		else:
+			monthlyTables = False
+
+		self._tweetsToMySQL(self.messageIDs(**params), replace = replace, monthlyTables = monthlyTables)
 
 	def search(self, **params):
 		"""

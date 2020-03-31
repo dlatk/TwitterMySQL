@@ -77,6 +77,14 @@ This command will write monthly tables pres_XXXX_XX (year_month) into the spainT
 ./twInterface.py -d spainTwitter -t msgs --monthly_tables --bounding_box -9.7 35.85 3.3 43.6 --auth ~/auth
 ```
 
+### Country Bounding Box
+
+If you want to pull tweets from an entire country you only need to use a two letter country code instead of the 2 lat/lon coordinates:
+
+```bash
+./twInterface.py -d netherlandsTwitter -t msgs --monthly_tables --country_bounding_box nl --auth ~/auth
+```
+
 ### Random Stream
 
 Takes the random sample of all tweets (~ 1%)
