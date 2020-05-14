@@ -61,12 +61,6 @@ This command will write a table time_lines in the ukTwitter database:
 ./twInterface.py -d mySchema -t time_lines --time_lines --user_list ~/example_ids.txt --auth ~/auth
 ```
 
-### Follow users
-
-Using the flag `--follow_users` with `--user_list` will pull timelines for all users in the list and then continuously loop over each user, pulling their most recent tweets (all tweets after the last tweet saved in the MySQL table `-t`).
-
-Use `--follow_users_with_cron` to do the above **without** continuously looping over the user list, i.e. pull most recent tweets once. Designed to be used with a cron job for scheduled pulls. 
-
 ### By search terms
 
 This command will write monthly tables pres_XXXX_XX (year_month) into the polTwitter database where each message contains one of the following terms: obama, trump, hillary or bernie.
@@ -143,21 +137,14 @@ Full list of flags:
 usage: twInterface.py [-h] [-d DB] [-t TABLE] [--auth AUTHFILE]
                       [--authJSON AUTHFILEJSON] [--monthly_tables]
                       [--output_file OUTPUTFILE]
-                      [--bounding_box FIELDS) [FIELD(S) ...]]
-                      [--country_bounding_box [FIELD(S) [FIELD(S) ...]]]
-                      [--time_lines] [--tweets_since_date TWEETSSINCEDATE]
-                      [--follow_users] [--follow_users_with_cron]
-                      [--stream_terms [FIELD(S) [FIELD(S) ...]]]
-                      [--stream_term_file STREAMFILE]
-                      [--search_terms [FIELD(S) [FIELD(S) ...]]]
-                      [--random_stream] [--social_network]
-                      [--profile_pictures] [--user_list USERLIST]
-                      [--message_list MESSAGELIST] [--check_spam]
-                      [--no_retweets] [--trim_user]
-                      [--column_short_list [FIELD(S) [FIELD(S ...]]]
-   
+                      [--bounding_box FIELDS) [FIELD(S) ...]] [--time_lines]
+                      [--search_terms [FIELD(S) [FIELD(S ...]]]
+                      [--search_term_file SEARCHFILE] [--random_stream]
+                      [--social_network] [--profile_pictures]
+                      [--user_list USERLIST] [--check_spam]
+
 Pull tweets from Twitter API
-   
+
 optional arguments:
   -h, --help            show this help message and exit
   -d DB                 MySQL database where tweets will be stored.
@@ -180,34 +167,14 @@ optional arguments:
                         miles) or LON LAT LON LAT (First pair is from bottom
                         left corner of box, second pair is from top right
                         corner).
-  --country_bounding_box [FIELD(S) [FIELD(S) ...]]
-                        Two letter country code for bounding box style grabber
   --time_lines          Pull timelines for given list of user names / screen
                         names.
-  --tweets_since_date TWEETSSINCEDATE
-                        Pull tweets since this date. Format: %Y-%m-%d. Use
-                        with --time_lines
-  --follow_users        Given a user list (--user_list) will CONTINUOUSLY loop
-                        over the list and pull all tweets since their most
-                        recent tweet saved in the MySQL db (-t). If no user
-                        list is given then pull most recent tweets for all
-                        users in a given table (-t).
-  --follow_users_with_cron
-                        Given a user list (--user_list) will loop over the
-                        list and pull all tweets since their most recent tweet
-                        saved in the MySQL db (-t). If no user list is given
-                        then pull most recent tweets for all users in a given
-                        table (-t) in a single loop.
-  --stream_terms [FIELD(S) [FIELD(S) ...]]
-                        Pull FUTURE tweets containing keywords. Must supply
-                        space separated list of search terms. Ex: taylorswift
-                        #1989 #arianagrande
-  --stream_term_file STREAMFILE
-                        Optional file containing list of stream terms to use
   --search_terms [FIELD(S) [FIELD(S) ...]]
-                        Pull PAST tweets containing keywords. Must supply
-                        space separated list of search terms. Ex: taylorswift
-                        #1989 #arianagrande
+                        Pull tweets containing keywords. Must supply space
+                        separated list of search terms. Ex: taylorswift #1989
+                        #arianagrande
+  --search_term_file SEARCHFILE
+                        Optional file containing list of search terms to use
   --random_stream       Grab data from the random stream.
   --social_network      Pull social network for given list of user names /
                         screen names. Must specify path to file which contains
@@ -216,17 +183,7 @@ optional arguments:
                         screen names. Must specify path to file which contains
                         list.
   --user_list USERLIST  File containing list of user ids / screen names
-  --message_list MESSAGELIST
-                        File containing list of message ids
   --check_spam          Check each message for spam
-  --no_retweets         Do NOT save retweets when using statuses/user_timeline
-                        (--pull_timelines and --follow_users)
-  --trim_user           Do NOT return User object in tweet when using
-                        statuses/user_timeline (--pull_timelines and
-                        --follow_users)
-  --column_short_list [FIELD(S) [FIELD(S) ...]]
-                        List of MySQL columns to save, instead of full list
-                        given in TwitterMySQL
 ```
 
 ## Tweet data

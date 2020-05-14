@@ -249,8 +249,9 @@ if __name__ == '__main__':
         tt = 0
         for user in open(args.userlist):
             tt += 1
-            print("########## User {tt}: {u}".format(tt=tt, u=user.rstrip('\n')))
-            search_params = isScreeName(search_params, user.rstrip('\n'))
+            user = user.rstrip()
+            print("########## User {tt}: {u}".format(tt=tt, u=user))
+            search_params = isScreeName(search_params, user)
             twtSQL.userTimelineToMySQL(**search_params)
 
     # follow users
