@@ -250,9 +250,22 @@ if __name__ == '__main__':
         for user in open(args.userlist):
             tt += 1
             user = user.rstrip()
-            print("########## User {tt}: {u}".format(tt=tt, u=user))
             search_params = isScreeName(search_params, user)
-            twtSQL.userTimelineToMySQL(**search_params)
+            if "user_id" in search_params:
+                user_params = {"user_id": search_params["user_id"]}
+            else:
+                user_params = {"screen_name": search_params["screen_name"]}
+
+            print("########## User {tt}: {u}".format(tt=tt, u=user))
+            try:
+                user_object = twtSQL._apiRequestNoRetry(twitterMethod="users/show", params=user_params).next()
+            except:
+                user_object = False
+            if user_object:
+                twtSQL.userTimelineToMySQL(**search_params)
+            else:
+                print("########## User {u} does not exist".format(u=user))
+
 
     # follow users
     elif args.followusers or args.followuserswithcron:

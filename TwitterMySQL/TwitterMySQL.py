@@ -588,6 +588,42 @@ class TwitterMySQL:
 			self._warn("Request attempted too many times (%d), it will not be executed anymore [%s]" % (nbAttempts, twitterMethod + str(params)))
 			return
 
+	def _apiRequestNoRetry(self, twitterMethod, params):
+		try:
+			r = self._api.request(twitterMethod, params)
+
+		except Exception as e:
+		# If the request doesn't work
+			if "timed out" in str(e).lower():
+				self._warn("Time out encountered, reconnecting immediately.")
+			else:
+				self._warn("Unknown error encountered: [%s]" % str(e))
+
+		# Request was successful in terms of http connection
+		try:
+			for i, response in enumerate(r.get_iterator()):
+				yield response
+		except ChunkedEncodingError as e:
+			self._warn("ChunkedEncodingError encountered, reconnecting immediately: [%s]" % e)
+		except Exception as e:
+			self._warn("unknown exception encountered: [%s]" % (str(e)))
+			traceback.print_exc()
+
+	def apiRequestNoRetry(self, twitterMethod, **params):
+		"""
+		Takes in a Twitter API request and yields formatted responses in return
+
+		Use as follows:
+		for tweet in twtSQL.apiRequest('statuses/filter', track="Twitter API"):
+			print tweet
+
+		For more info (knowing which twitterMethod to use) see:
+		http://dev.twitter.com/rest/public
+		http://dev.twitter.com/streaming/overview
+		"""
+		return self._apiRequestNoRetry(twitterMethod, params)
+
+
 	def apiRequest(self, twitterMethod, **params):
 		"""
 		Takes in a Twitter API request and yields formatted responses in return
