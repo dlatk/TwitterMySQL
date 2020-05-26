@@ -261,10 +261,14 @@ if __name__ == '__main__':
                 user_object = twtSQL._apiRequestNoRetry(twitterMethod="users/show", params=user_params).next()
             except:
                 user_object = False
-            if user_object:
-                twtSQL.userTimelineToMySQL(**search_params)
-            else:
                 print("########## User {u} does not exist".format(u=user))
+                continue
+            if 'protected' in user_object and user_object['protected']:
+                print("########## User {u} is private".format(u=user))
+                continue
+            else:
+                twtSQL.userTimelineToMySQL(**search_params)
+                
 
 
     # follow users
