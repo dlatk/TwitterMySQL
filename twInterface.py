@@ -182,8 +182,6 @@ if __name__ == '__main__':
                 twtSQL.searchToMySQL(**search_params)
         else:
             search_params['locations'] = ",".join(args.bb)
-            print(search_params['locations'])
-            exit()
             while True:
                 twtSQL.filterStreamToMySQL(**search_params)
     
@@ -304,7 +302,7 @@ if __name__ == '__main__':
         id_list = []
         for msgid in open(args.messagelist):
             num_msgs += 1
-            id_list.append(str(msgid.rstrip('\n')))
+            id_list.append(str(msgid.rstrip('\r\n')))
             if num_msgs == 100:
                 print("########## Pulling 100 messages")
                 search_params['id'] = ','.join(id_list)
