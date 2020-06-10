@@ -728,14 +728,14 @@ class TwitterMySQL:
 		self._tweetsToMySQL(self._apiRequest(twitterMethod, params), replace = replace, monthlyTables = monthlyTables)
 		return
 
-	def randomSampleToMySQL(self, replace = False, monthlyTables = True):
+	def randomSampleToMySQL(self, **params):
 		"""
 		Takes the random sample of all tweets (~ 1%) and
 		inserts it into monthly table [tableName_20YY_MM].
 		For more info, see:
 		http://dev.twitter.com/streaming/reference/get/statuses/sample
 		"""
-		self.tweetsToMySQL('statuses/sample', replace = replace, monthlyTables = monthlyTables)
+		self.tweetsToMySQL('statuses/sample', **params)
 
 	def filterStreamToMySQL(self, **params):
 		"""
