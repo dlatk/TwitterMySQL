@@ -99,7 +99,8 @@ if __name__ == '__main__':
                         help='Do NOT return User object in tweet when using statuses/user_timeline (--pull_timelines and --follow_users)')
     parser.add_argument('--column_short_list', type=str, metavar='FIELD(S)', dest='columnshortlist', nargs='*', default=DEFAULT_COLUMN_SH,
                         help='List of MySQL columns to save, instead of full list given in TwitterMySQL')
-
+    parser.add_argument('--save_json', dest='savejson', default='',
+                        help='Location (directory path) to save raw tweets as json files.')
     args = parser.parse_args()
     
     # where are we writing everything? no database needed for profile pictures or social networks
@@ -148,6 +149,12 @@ if __name__ == '__main__':
 
     if args.checkspam:
         params['checkSpam'] = True
+
+    if args.savejson:
+        if not os.path.isdir(args.savejson):
+            print("The directory {data_dir} does not exist. Please create and rerun".format(data_dir=kwargs["saveJSON"]))
+            sys.exit(1)
+        params['saveJSON'] = args.savejson
 
     if args.bb:
         params['geoLocate'] = locationInfo.LocationMap().reverseGeocodeLocal

@@ -97,7 +97,8 @@ DEFAULT_TWEET_JSON_SQL_CORR = {'message_id': "['id_str']",
 								'tweet_location_short': "['place']['name']",
 								'place_type': "['place']['place_type']" }
 
-TWEET_DATE_LOCATION = 3
+TWEET_TIME_COLUMN = "created_at_utc"
+TWEET_DATE_LOCATION = [i for i, x in enumerate(DEFAULT_MYSQL_COL_DESC) if TWEET_TIME_COLUMN in x][0]
 
 class TwitterMySQL:
 	"""Wrapper for the integration of Twitter APIs into MySQL
@@ -137,6 +138,7 @@ class TwitterMySQL:
 						[Default: localhost]
 	- columnShortList	List of MySQL columns to save, must correspond
 						to keys in DEFAULT_TWEET_JSON_SQL_CORR
+	- saveJSON 			Location (directory path) where raw tweet json are saved
 	- any other MySQL.connect argument
 	"""
 
@@ -163,6 +165,15 @@ class TwitterMySQL:
 			del kwargs["geoLocate"]
 		else:
 			self.geoLocate = None
+
+		if "monthlyTables" in kwargs:
+			if params["monthlyTables"]:
+				self.monthlyTables = True
+			else:
+				self.monthlyTables = False
+			del kwargs["monthlyTables"]
+		else:
+			self.monthlyTables = False
 
 		if "noWarnings" in kwargs and kwargs["noWarnings"]:
 			del kwargs["noWarnings"]
@@ -241,6 +252,15 @@ class TwitterMySQL:
 			del kwargs["tweetsSinceDate"]
 		else:
 			self.tweets_since_date = ""
+
+		if "saveJSON" in kwargs:
+			if not os.path.isdir(kwargs["saveJSON"]):
+				print("The directory {data_dir} does not exist. Please create and rerun".format(data_dir=kwargs["saveJSON"]))
+				sys.exit(1)
+			self.save_json = kwargs["saveJSON"]
+			del kwargs["saveJSON"]
+		else:
+			self.save_json = ""
 
 		try:
 			self._connect(kwargs)
@@ -528,6 +548,21 @@ class TwitterMySQL:
 
 		# Tweet is dictionary of depth one, now has to be linearized
 		tweet = [tweet[SQLcol] for SQLcol in self.columns]
+		
+		if self.save_json:
+			if self.monthlyTables:
+				yearMonth = self._yearMonth(tweet[TWEET_DATE_LOCATION])
+				tweet_file = self.table+"_"+yearMonth
+			else:
+				tweet_file = self.table
+			if os.path.exists(self.save_json + "/" + tweet_file):
+			    append_write = 'a' # append if already exists
+			else:
+			    append_write = 'w' # make a new file if not
+			with open(self.save_json + "/" + tweet_file, append_write) as json_outfile:
+			    json.dump(jTweet, json_outfile)
+			    json_outfile.write('\n')
+
 		return tweet
 
 	def _apiRequest(self, twitterMethod, params):
@@ -639,7 +674,7 @@ class TwitterMySQL:
 		for response in self._apiRequest(twitterMethod, params):
 			yield response
 
-	def _tweetsToMySQL(self, tweetsYielder, replace = False, monthlyTables = False):
+	def _tweetsToMySQL(self, tweetsYielder, replace = False):
 		"""
 		Tool function to insert tweets into MySQL tables in chunks,
 		while outputting counts.
@@ -663,7 +698,7 @@ class TwitterMySQL:
 
 			if i % TWEET_LIMIT_BEFORE_INSERT == 0:
 				print
-				if monthlyTables:
+				if self.monthlyTables:
 					for yearMonth, twts in tweetsDict.iteritems():
 						table = self.table+"_"+yearMonth
 						if replace:
@@ -681,7 +716,7 @@ class TwitterMySQL:
 		# If there are remaining tweets
 		if any(tweetsDict.values()):
 			print
-			if monthlyTables:
+			if self.monthlyTables:
 				for yearMonth, twts in tweetsDict.iteritems():
 					table = self.table+"_"+yearMonth
 					if replace:
@@ -720,12 +755,13 @@ class TwitterMySQL:
 		else:
 			replace = False
 		if "monthlyTables" in params:
-			monthlyTables = params["monthlyTables"]
+			if params["monthlyTables"]:
+				self.monthlyTables = True
+			else:
+				self.monthlyTables = False
 			del params["monthlyTables"]
-		else:
-			monthlyTables = False
 
-		self._tweetsToMySQL(self._apiRequest(twitterMethod, params), replace = replace, monthlyTables = monthlyTables)
+		self._tweetsToMySQL(self._apiRequest(twitterMethod, params), replace = replace)
 		return
 
 	def randomSampleToMySQL(self, **params):
@@ -814,12 +850,13 @@ class TwitterMySQL:
 			replace = False
 
 		if "monthlyTables" in params:
-			monthlyTables = params["monthlyTables"]
+			if params["monthlyTables"]:
+				self.monthlyTables = True
+			else:
+				self.monthlyTables = False
 			del params["monthlyTables"]
-		else:
-			monthlyTables = False
 
-		self._tweetsToMySQL(self.userTimeline(**params), replace = replace, monthlyTables = monthlyTables)
+		self._tweetsToMySQL(self.userTimeline(**params), replace = replace)
 
 	def messageIDs(self, **params):
 		"""
@@ -854,12 +891,13 @@ class TwitterMySQL:
 			replace = False
 
 		if "monthlyTables" in params:
-			monthlyTables = params["monthlyTables"]
+			if params["monthlyTables"]:
+				self.monthlyTables = True
+			else:
+				self.monthlyTables = False
 			del params["monthlyTables"]
-		else:
-			monthlyTables = False
 
-		self._tweetsToMySQL(self.messageIDs(**params), replace = replace, monthlyTables = monthlyTables)
+		self._tweetsToMySQL(self.messageIDs(**params), replace = replace)
 
 	def search(self, **params):
 		"""
@@ -909,12 +947,13 @@ class TwitterMySQL:
 			replace = False
 
 		if "monthlyTables" in params:
-			monthlyTables = params["monthlyTables"]
+			if params["monthlyTables"]:
+				self.monthlyTables = True
+			else:
+				self.monthlyTables = False
 			del params["monthlyTables"]
-		else:
-			monthlyTables = False
 
-		self._tweetsToMySQL(self.search(**params), replace = replace, monthlyTables = monthlyTables)
+		self._tweetsToMySQL(self.search(**params), replace = replace)
 
 	def _nonTweetsToOutput(self, tweetsYielder, replace = False, monthlyTables = False, method = '', outputName = ''):
 		"""
