@@ -282,26 +282,71 @@ if __name__ == '__main__':
             search_params['trim_user'] = 'true'
         if args.noretweets:
             search_params['include_rts'] = 'false'
-
+        tt = 0
         if args.userlist:
             print("########## First pulling timelines for given users")
             for user in open(args.userlist):
-                print("########## User {t}: {u}".format(t=total_users, u=user.rstrip('\n')))
-                search_params = isScreeName(search_params, user.rstrip('\n'))
-                twtSQL.userTimelineToMySQL(**search_params)
+                tt += 1
+                user = user.rstrip().rstrip('\n')
+                search_params = isScreeName(search_params, user)
+                if "user_id" in search_params:
+                    user_params = {"user_id": search_params["user_id"]}
+                else:
+                    user_params = {"screen_name": search_params["screen_name"]}
+                print("########## User {tt}: {u}".format(tt=tt, u=user))
+                
+                try:
+                    user_object = twtSQL._apiRequestNoRetry(twitterMethod="users/show", params=user_params).next()
+                except:
+                    user_object = False
+                    print("########## User {u} does not exist".format(u=user))
+                    continue
+                if 'protected' in user_object and user_object['protected']:
+                    print("########## User {u} is private".format(u=user))
+                    continue
+                else:
+                    twtSQL.userTimelineToMySQL(**search_params)
+        tt = 0
         if args.followusers:
             while True:
                 user_msg_dict = dict(twtSQL.getUserMaxIDList())
                 for user_id, last_message_id in user_msg_dict.items():
+                    tt += 1
                     search_params['user_id'] = user_id
                     search_params['since_id'] = last_message_id
-                    twtSQL.userTimelineToMySQL(**search_params)
+                    user_params = {"user_id": search_params["user_id"]}
+                    print("########## User {tt}: {u}".format(tt=tt, u=user_id))
+                    try:
+                        user_object = twtSQL._apiRequestNoRetry(twitterMethod="users/show", params=user_params).next()
+                    except:
+                        user_object = False
+                        print("########## User {u} does not exist".format(u=user_id))
+                        continue
+                    if 'protected' in user_object and user_object['protected']:
+                        print("########## User {u} is private".format(u=user_id))
+                        continue
+                    else:
+                        twtSQL.userTimelineToMySQL(**search_params)
         else:
             user_msg_dict = dict(twtSQL.getUserMaxIDList())
             for user_id, last_message_id in user_msg_dict.items():
+                tt += 1
                 search_params['user_id'] = user_id
                 search_params['since_id'] = last_message_id
-                twtSQL.userTimelineToMySQL(**search_params)
+                user_params = {"user_id": search_params["user_id"]}
+                print("########## User {tt}: {u}".format(tt=tt, u=user_id))
+                try:
+                    user_object = twtSQL._apiRequestNoRetry(twitterMethod="users/show", params=user_params).next()
+                except:
+                    user_object = False
+                    print("########## User {u} does not exist".format(u=user_id))
+                    del user_msg_dict[user_id]
+                    continue
+                if 'protected' in user_object and user_object['protected']:
+                    print("########## User {u} is private".format(u=user_id))
+                    continue
+                else:
+                    twtSQL.userTimelineToMySQL(**search_params) 
 
     # pull tweets for a given message list
     elif args.messagelist:
