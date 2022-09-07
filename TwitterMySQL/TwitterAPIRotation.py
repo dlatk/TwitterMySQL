@@ -16,7 +16,9 @@ class TwitterAPIRotation:
 	"""
 
 	def __init__(self, twapi_conn_list = None, twapi_cred_list_file = None, twapi_token_list=None):
-		self.connections = [] # a list of size 2 lists that hold (twitterAPI object, time till reconnect)
+		# a list of lists
+                # elemnts in the list are of the form - (twitterAPI object, time till reconnect, endpoint request counter)
+		self.connections = []
 		self.current_conn = -1
 
 		assert not (twapi_conn_list and twapi_cred_list_file)
@@ -37,14 +39,14 @@ class TwitterAPIRotation:
 		return conn_list
 
 	def _get_conn(self):
-		return self.connections[self.current_conn][0]
+		return self.connections[self.current_conn]['connection']
 
 	def _get_next_conn(self):
 		self.current_conn = (self.current_conn + 1) % len(self.connections)
 		return self._get_conn()
 
 	def register_connection(self, connection):
-		self.connections.append([connection, None])
+		self.connections.append({'connection': connection, 'request_count': {}, 'wait_until': {}})
 
 	def _wait_until(self, target_time):
 		now = time.time()
@@ -59,13 +61,34 @@ class TwitterAPIRotation:
 
 
 	def request(self, twitterMethod, params):
+
 		#try all the connections to see if I can get a non 429 response
 		assert len(self.connections), "must have at least 1 connection"
-		for i in range(0,len(self.connections)):
+
+		for i in range(0, len(self.connections)):
 			conn = self._get_next_conn()
-			resp = conn.request(twitterMethod, params)
-			if resp.status_code != 429: #too many requests
-				return resp
-		#if all connections return 429 responses, wait for an appropriate time and then try again
-		self._wait_until(int(resp.headers['x-rate-limit-reset']))
+
+			if (twitterMethod not in self.connections[self.current_conn]['wait_until']) or \
+			   (self.connections[self.current_conn]['wait_until'][twitterMethod] < time.time()):
+
+				resp = conn.request(twitterMethod, params)
+				if twitterMethod in self.connections[self.current_conn]['request_count']:
+					self.connections[self.current_conn]['request_count'][twitterMethod] += 1
+				else:
+					self.connections[self.current_conn]['request_count'][twitterMethod] = 1
+
+				if twitterMethod == 'statuses/user_timeline' and self.connections[self.current_conn]['request_count'][twitterMethod] == 100000:
+					self.connections[self.current_conn]['request_count'][twitterMethod] = 0
+					self.connections[self.current_conn]['wait_until'][twitterMethod] = time.time() + 24 * 3600
+                                        print("100,000 request limit reached for statuses/user_timeline - waiting...")
+
+				if resp.status_code == 429: #too many requests
+					self.connections[self.current_conn]['wait_until'][twitterMethod] = float(resp.headers['x-rate-limit-reset'])
+                                        print("Too many requests for", twitterMethod, "- waiting...")
+
+				if resp.status_code != 429:
+					return resp
+
+                #if you didn't get any connection, wait for the one that's available the earliest
+		self._wait_until(min([conn['wait_until'][twitterMethod] for conn in self.connections]))
 		return self.request(twitterMethod, params)
