@@ -277,7 +277,7 @@ class TwitterMySQL:
 
 		self._connection = MySQLdb.connect(**kwargs)
 		self.cur = self._connection.cursor()
-
+        
 	def _wait(self, t, verbose = True):
 		"""Wait function, offers a nice countdown"""
 		for i in xrange(t):
@@ -298,7 +298,7 @@ class TwitterMySQL:
 		try:
 			ret = self.cur.execute(query)
 		except Exception as e:
-			if "MySQL server has gone away" in str(e):
+			if ("MySQL server has gone away" in str(e)) or isinstance(e, MySQLdb.InterfaceError):
 				self._connect()
 			nbAttempts += 1
 			if not verbose: print "SQL:\t%s" % query[:200]
@@ -321,7 +321,7 @@ class TwitterMySQL:
 			for i in xrange(len(values)):
 				ret += self.cur.execute(query, values[i])
 		except Exception as e:
-			if "MySQL server has gone away" in str(e):
+			if ("MySQL server has gone away" in str(e)) or isinstance(e, MySQLdb.InterfaceError): 
 				self._connect()
 				nbAttempts += 1
 				if not verbose: print "SQL:\t%s" % query[:200]

@@ -101,6 +101,8 @@ if __name__ == '__main__':
                         help='List of MySQL columns to save, instead of full list given in TwitterMySQL')
     parser.add_argument('--save_json', dest='savejson', default='',
                         help='Location (directory path) to save raw tweets as json files.')
+    parser.add_argument('--log_file', dest='logfile', default='./logs', 
+                        help='Location (file path) to save logs saying the users that were scraped.')
     args = parser.parse_args()
     
     # where are we writing everything? no database needed for profile pictures or social networks
@@ -251,6 +253,7 @@ if __name__ == '__main__':
             search_params['trim_user'] = 'true'
         if args.noretweets:
             search_params['include_rts'] = 'false'
+        f = open(args.logfile, 'w')
         tt = 0
         for user in open(args.userlist):
             tt += 1
@@ -261,7 +264,9 @@ if __name__ == '__main__':
             else:
                 user_params = {"screen_name": search_params["screen_name"]}
 
-            print("########## User {tt}: {u}".format(tt=tt, u=user))
+            string = "########## User {tt}: {u}".format(tt=tt, u=user)
+            print(string)
+            f.write(string + '\n')
             try:
                 user_object = twtSQL._apiRequestNoRetry(twitterMethod="users/show", params=user_params).next()
             except:
